@@ -3,10 +3,10 @@ from datetime import datetime
 from socket import AF_INET, SOCK_DGRAM, socket
 from struct import pack, unpack
 
-from zk import const
-from zk.attendance import Attendance
-from zk.exception import ZKErrorResponse, ZKNetworkError
-from zk.user import User
+from . import const
+from .attendance import Attendance
+from .exception import ZKErrorResponse, ZKNetworkError
+from .user import User
 
 
 class ZK(object):
