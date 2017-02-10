@@ -343,9 +343,11 @@ class ZK(object):
         else:
             raise ZKErrorResponse("Invalid response")
 
-    def get_users(self):
+    def get_users(self, ack_ok=True):
         '''
         return all user
+        :param ack_ok: bool, acknowledge if order perform successfully. In some cases, we still need to get such bad data. This could allow us to do that
+        :return users: List of User object in form of [User(uid, name, privilege, password, group_id, user_id),]
         '''
 
         command = const.CMD_USERTEMP_RRQ
@@ -368,33 +370,33 @@ class ZK(object):
 
                 data_recv = self.__sock.recv(8)
                 response = unpack('HHHH', data_recv[:8])[0]
-                if response == const.CMD_ACK_OK:
-                    if userdata:
-                        # The first 4 bytes don't seem to be related to the user
-                        for x in xrange(len(userdata)):
-                            if x > 0:
-                                userdata[x] = userdata[x][8:]
-
-                        userdata = ''.join(userdata)
-                        userdata = userdata[12:]
-                        while len(userdata) >= 72:
-                            uid, privilege, password, name, sparator, group_id, user_id = unpack('2sc8s28sc7sx24s', userdata.ljust(72)[:72])
-                            u1 = int(uid[0].encode("hex"), 16)
-                            u2 = int(uid[1].encode("hex"), 16)
-
-                            uid = u1 + (u2 * 256)
-                            privilege = int(privilege.encode("hex"), 16)
-                            password = unicode(password.strip('\x00|\x01\x10x'), errors='ignore')
-                            name = unicode(name.strip('\x00|\x01\x10x'), errors='ignore')
-                            group_id = unicode(group_id.strip('\x00|\x01\x10x'), errors='ignore')
-                            user_id = unicode(user_id.strip('\x00|\x01\x10x'), errors='ignore')
-
-                            user = User(uid, name, privilege, password, group_id, user_id)
-                            users.append(user)
-
-                            userdata = userdata[72:]
-                else:
+                if ack_ok and response != const.CMD_ACK_OK:
                     raise ZKErrorResponse("Invalid response")
+                
+                if userdata:
+                    # The first 4 bytes don't seem to be related to the user
+                    for x in xrange(len(userdata)):
+                        if x > 0:
+                            userdata[x] = userdata[x][8:]
+
+                    userdata = ''.join(userdata)
+                    userdata = userdata[12:]
+                    while len(userdata) >= 72:
+                        uid, privilege, password, name, sparator, group_id, user_id = unpack('2sc8s28sc7sx24s', userdata.ljust(72)[:72])
+                        u1 = int(uid[0].encode("hex"), 16)
+                        u2 = int(uid[1].encode("hex"), 16)
+
+                        uid = u1 + (u2 * 256)
+                        privilege = int(privilege.encode("hex"), 16)
+                        password = unicode(password.strip('\x00|\x01\x10x'), errors='ignore')
+                        name = unicode(name.strip('\x00|\x01\x10x'), errors='ignore')
+                        group_id = unicode(group_id.strip('\x00|\x01\x10x'), errors='ignore')
+                        user_id = unicode(user_id.strip('\x00|\x01\x10x'), errors='ignore')
+
+                        user = User(uid, name, privilege, password, group_id, user_id)
+                        users.append(user)
+
+                        userdata = userdata[72:]                    
 
         return users
 
