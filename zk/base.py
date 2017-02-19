@@ -447,9 +447,13 @@ class ZK(object):
         else:
             raise ZKErrorResponse("Invalid response")
 
-    def get_attendance(self):
+    def get_attendance(self, data_ack=True):
         '''
         return all attendance record
+        :param data_ack: set to True to acknowledge if the order was performed successfully
+        :type data_ack: Boolean
+        :return list of Attendance records where each is Attendance(user_id, timestamp, status)
+        :rtype: List
         '''
         command = const.CMD_ATTLOG_RRQ
         command_string = ''
@@ -471,28 +475,28 @@ class ZK(object):
 
                 data_recv = self.__sock.recv(8)
                 response = unpack('HHHH', data_recv[:8])[0]
-                if response == const.CMD_ACK_OK:
-                    if attendance_data:
-                        # The first 4 bytes don't seem to be related to the user
-                        for x in xrange(len(attendance_data)):
-                            if x > 0:
-                                attendance_data[x] = attendance_data[x][8:]
+                if data_ack and response != const.CMD_ACK_OK:
+                    raise ZKErrorResponse("Invalid response, code %s. The code should 2000 (CMD_ACK_OK)" % response)
+                
+                if attendance_data:
+                    # The first 4 bytes don't seem to be related to the user
+                    for x in xrange(len(attendance_data)):
+                        if x > 0:
+                            attendance_data[x] = attendance_data[x][8:]
 
-                        attendance_data = ''.join(attendance_data)
-                        attendance_data = attendance_data[14:]
-                        while len(attendance_data) >= 38:
-                            user_id, sparator, timestamp, status, space = unpack('24sc4sc10s', attendance_data.ljust(40)[:40])
+                    attendance_data = ''.join(attendance_data)
+                    attendance_data = attendance_data[14:]
+                    while len(attendance_data) >= 38:
+                        user_id, sparator, timestamp, status, space = unpack('24sc4sc10s', attendance_data.ljust(40)[:40])
 
-                            user_id = user_id.strip('\x00|\x01\x10x')
-                            timestamp = self.__decode_time(timestamp)
-                            status = int(status.encode("hex"), 16)
+                        user_id = user_id.strip('\x00|\x01\x10x')
+                        timestamp = self.__decode_time(timestamp)
+                        status = int(status.encode("hex"), 16)
 
-                            attendance = Attendance(user_id, timestamp, status)
-                            attendances.append(attendance)
+                        attendance = Attendance(user_id, timestamp, status)
+                        attendances.append(attendance)
 
-                            attendance_data = attendance_data[40:]
-                else:
-                    raise ZKErrorResponse("Invalid response")
+                        attendance_data = attendance_data[40:]
 
         return attendances
 
