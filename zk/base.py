@@ -2,6 +2,7 @@
 from datetime import datetime
 from socket import AF_INET, SOCK_DGRAM, socket
 from struct import pack, unpack
+import time
 
 from . import const
 from .attendance import Attendance
@@ -16,11 +17,13 @@ class ZK(object):
     __data_recv = None
     __sesion_id = 0
     __reply_id = 0
+    __timeout = 0
 
     def __init__(self, ip, port=4370, timeout=60):
+        self.__timeout = timeout
         self.__address = (ip, port)
         self.__sock = socket(AF_INET, SOCK_DGRAM)
-        self.__sock.settimeout(timeout)
+        self.__sock.settimeout(self.__timeout)
 
     def __create_header(self, command, command_string, checksum, session_id, reply_id):
         '''
@@ -445,7 +448,59 @@ class ZK(object):
         if cmd_response.get('status'):
             return True
         else:
-            raise ZKErrorResponse("Invalid response")
+            raise ZKErrorResponse("Invalid response")   
+    
+        
+    def recv_timeout(self, buff=1032):
+
+        total_bytes = self.__get_data_size()
+        org_total_bytes = total_bytes
+        
+        #make socket non blocking
+        self.__sock.setblocking(0)
+         
+        #total data partwise in an array
+        total_data=[];
+        data_recv = False
+         
+        #beginning time
+        begin=time.time()
+        while 1:
+            #if you got some data, then break after timeout
+            if total_data and time.time()-begin > self.__timeout:
+                break
+             
+            #if you got no data at all, wait a little longer, twice the timeout
+            elif time.time()-begin > self.__timeout * 2:
+                break
+             
+            #recv something
+            try:
+                data = False
+                if org_total_bytes > 0:
+                    data = self.__sock.recv(buff)
+                else:
+                    data = self.__sock.recv(8)
+                    
+                if data:
+                    if org_total_bytes > 0:
+                        total_data.append(data)
+                    else:
+                        data_recv = data
+                        
+                    org_total_bytes -= (buff-8)
+                    #change the beginning time for measurement
+                    begin=time.time()
+                else:
+                    #sleep for sometime to indicate a gap
+                    time.sleep(0.1)
+            except:
+                pass
+        
+        self.__sock.settimeout(self.__timeout)
+
+        return total_data, data_recv
+
 
     def get_attendance(self, data_ack=True):
         '''
@@ -465,16 +520,15 @@ class ZK(object):
         cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
         attendances = []
         if cmd_response.get('status'):
-            if cmd_response.get('code') == const.CMD_PREPARE_DATA:
-                bytes = self.__get_data_size()
-                attendance_data = []
-                while bytes > 0:
-                    data_recv = self.__sock.recv(1032)
-                    attendance_data.append(data_recv)
-                    bytes -= 1024
-
-                data_recv = self.__sock.recv(8)
-                response = unpack('HHHH', data_recv[:8])[0]
+            if cmd_response.get('code') == const.CMD_PREPARE_DATA:                
+                attendance_data, data_recv = self.recv_timeout()
+                response = False
+                try:
+                    if not data_recv:
+                        data_recv = self.__sock.recv(8)
+                    response = unpack('HHHH', data_recv[:8])[0]
+                except:
+                    pass
                 if data_ack and response != const.CMD_ACK_OK:
                     raise ZKErrorResponse("Invalid response, code %s. The code should 2000 (CMD_ACK_OK)" % response)
                 
@@ -487,7 +541,7 @@ class ZK(object):
                     attendance_data = ''.join(attendance_data)
                     attendance_data = attendance_data[14:]
                     while len(attendance_data) >= 38:
-                        user_id, sparator, timestamp, status, space = unpack('24sc4sc10s', attendance_data.ljust(40)[:40])
+                        user_id, separator, timestamp, status, space = unpack('24sc4sc10s', attendance_data.ljust(40)[:40])
 
                         user_id = user_id.strip('\x00|\x01\x10x')
                         timestamp = self.__decode_time(timestamp)
