@@ -3,6 +3,7 @@ from datetime import datetime
 from socket import AF_INET, SOCK_DGRAM, socket
 from struct import pack, unpack
 import time
+import select
 
 from . import const
 from .attendance import Attendance
@@ -458,6 +459,14 @@ class ZK(object):
         
         #make socket non blocking
         self.__sock.setblocking(0)
+        
+        def is_ready(sock, timeout):
+            ready = select.select([sock], [], [], timeout)
+            if ready[0]:
+                return True
+            else:
+                return False
+            
          
         #total data partwise in an array
         total_data=[];
@@ -478,9 +487,11 @@ class ZK(object):
             try:
                 data = False
                 if org_total_bytes > 0:
-                    data = self.__sock.recv(buff)
+                    if is_ready(self.__sock, self.__timeout):
+                        data = self.__sock.recv(buff)
                 else:
-                    data = self.__sock.recv(8)
+                    if is_ready(self.__sock, self.__timeout):
+                        data = self.__sock.recv(8)
                     
                 if data:
                     if org_total_bytes > 0:
