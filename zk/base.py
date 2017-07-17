@@ -259,6 +259,41 @@ class ZK(object):
         '''
         command_string = '~SerialNumber'
         return self._get_options_rrq(command_string)
+    
+    def get_oem_vendor(self):
+        '''
+        return the OEM Vendor of the device
+        '''
+        command_string = '~OEMVendor'
+        return self._get_options_rrq(command_string)
+    
+    def get_fingerprint_algorithm(self):
+        '''
+        return the Fingerprint Algorithm (aka ZKFPVersion) of the device
+        '''
+        command_string = '~ZKFPVersion'
+        return self._get_options_rrq(command_string)
+    
+    def get_platform(self):
+        '''
+        return the platform on which the device is based, e.g. ZMM100_TFT
+        '''
+        command_string = '~Platform'
+        return self._get_options_rrq(command_string)
+    
+    def get_device_name(self):
+        '''
+        return the name of the device, e.g. B3-C
+        '''
+        command_string = '~DeviceName'
+        return self._get_options_rrq(command_string)
+    
+    def get_workcode(self):
+        '''
+        return the work code
+        '''
+        command_string = '~WCFO'
+        return self._get_options_rrq(command_string)
 
     def restart(self):
         '''
