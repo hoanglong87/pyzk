@@ -230,13 +230,17 @@ class ZK(object):
             return firmware_version
         else:
             raise ZKErrorResponse("Invalid response")
-
-    def get_serialnumber(self):
+        
+        
+    def _get_options_rrq(self, command_string):
+        '''
+        common method for others to extend which want const.CMD_OPTIONS_RRQ
+        '''
         '''
         return the serial number
         '''
         command = const.CMD_OPTIONS_RRQ
-        command_string = '~SerialNumber'
+        command_string = command_string
         checksum = 0
         session_id = self.__sesion_id
         reply_id = self.__reply_id
@@ -248,6 +252,13 @@ class ZK(object):
             return serialnumber
         else:
             raise ZKErrorResponse("Invalid response")
+
+    def get_serialnumber(self):
+        '''
+        return the serial number
+        '''
+        command_string = '~SerialNumber'
+        return self._get_options_rrq(command_string)
 
     def restart(self):
         '''
