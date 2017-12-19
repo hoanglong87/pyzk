@@ -230,8 +230,7 @@ class ZK(object):
             return firmware_version
         else:
             raise ZKErrorResponse("Invalid response")
-        
-        
+
     def _get_options_rrq(self, command_string):
         '''
         common method for others to extend which want const.CMD_OPTIONS_RRQ
@@ -259,35 +258,35 @@ class ZK(object):
         '''
         command_string = '~SerialNumber'
         return self._get_options_rrq(command_string)
-    
+
     def get_oem_vendor(self):
         '''
         return the OEM Vendor of the device
         '''
         command_string = '~OEMVendor'
         return self._get_options_rrq(command_string)
-    
+
     def get_fingerprint_algorithm(self):
         '''
         return the Fingerprint Algorithm (aka ZKFPVersion) of the device
         '''
         command_string = '~ZKFPVersion'
         return self._get_options_rrq(command_string)
-    
+
     def get_platform(self):
         '''
         return the platform on which the device is based, e.g. ZMM100_TFT
         '''
         command_string = '~Platform'
         return self._get_options_rrq(command_string)
-    
+
     def get_device_name(self):
         '''
         return the name of the device, e.g. B3-C
         '''
         command_string = '~DeviceName'
         return self._get_options_rrq(command_string)
-    
+
     def get_workcode(self):
         '''
         return the work code
@@ -422,7 +421,7 @@ class ZK(object):
                 response = unpack('HHHH', data_recv[:8])[0]
                 if ack_ok and response != const.CMD_ACK_OK:
                     raise ZKErrorResponse("Invalid response")
-                
+
                 if userdata:
                     # The first 4 bytes don't seem to be related to the user
                     for x in xrange(len(userdata)):
@@ -446,7 +445,7 @@ class ZK(object):
                         user = User(uid, name, privilege, password, group_id, user_id)
                         users.append(user)
 
-                        userdata = userdata[72:]                    
+                        userdata = userdata[72:]
 
         return users
 
@@ -495,41 +494,39 @@ class ZK(object):
         if cmd_response.get('status'):
             return True
         else:
-            raise ZKErrorResponse("Invalid response")   
-    
-        
+            raise ZKErrorResponse("Invalid response")
+
     def recv_timeout(self, buff=1032):
 
         total_bytes = self.__get_data_size()
         org_total_bytes = total_bytes
-        
-        #make socket non blocking
+
+        # make socket non blocking
         self.__sock.setblocking(0)
-        
+
         def is_ready(sock, timeout):
             ready = select.select([sock], [], [], timeout)
             if ready[0]:
                 return True
             else:
                 return False
-            
-         
-        #total data partwise in an array
-        total_data=[];
+
+        # total data partwise in an array
+        total_data = [];
         data_recv = False
-         
-        #beginning time
-        begin=time.time()
+
+        # beginning time
+        begin = time.time()
         while 1:
-            #if you got some data, then break after timeout
-            if total_data and time.time()-begin > self.__timeout:
+            # if you got some data, then break after timeout
+            if total_data and time.time() - begin > self.__timeout:
                 break
-             
-            #if you got no data at all, wait a little longer, twice the timeout
-            elif time.time()-begin > self.__timeout * 2:
+
+            # if you got no data at all, wait a little longer, twice the timeout
+            elif time.time() - begin > self.__timeout * 2:
                 break
-             
-            #recv something
+
+            # recv something
             try:
                 data = False
                 if org_total_bytes > 0:
@@ -538,26 +535,25 @@ class ZK(object):
                 else:
                     if is_ready(self.__sock, self.__timeout):
                         data = self.__sock.recv(8)
-                    
+
                 if data:
                     if org_total_bytes > 0:
                         total_data.append(data)
                     else:
                         data_recv = data
-                        
-                    org_total_bytes -= (buff-8)
-                    #change the beginning time for measurement
-                    begin=time.time()
+
+                    org_total_bytes -= (buff - 8)
+                    # change the beginning time for measurement
+                    begin = time.time()
                 else:
-                    #sleep for sometime to indicate a gap
+                    # sleep for sometime to indicate a gap
                     time.sleep(0.1)
             except:
                 pass
-        
+
         self.__sock.settimeout(self.__timeout)
 
         return total_data, data_recv
-
 
     def get_attendance(self, data_ack=True):
         '''
@@ -577,7 +573,7 @@ class ZK(object):
         cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
         attendances = []
         if cmd_response.get('status'):
-            if cmd_response.get('code') == const.CMD_PREPARE_DATA:                
+            if cmd_response.get('code') == const.CMD_PREPARE_DATA:
                 attendance_data, data_recv = self.recv_timeout()
                 response = False
                 try:
@@ -587,8 +583,8 @@ class ZK(object):
                 except:
                     pass
                 if data_ack and response != const.CMD_ACK_OK:
-                    raise ZKErrorResponse("Invalid response, code %s. The code should 2000 (CMD_ACK_OK)" % response)
-                
+                    raise ZKErrorResponse("Invalid response, code %s. The code should be 2000 (CMD_ACK_OK)" % response)
+
                 if attendance_data:
                     # The first 4 bytes don't seem to be related to the user
                     for x in xrange(len(attendance_data)):
