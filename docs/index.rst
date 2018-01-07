@@ -63,7 +63,7 @@ Basic Usage
         conn.test_voice()
         print 'Enabling device ...'
         conn.enable_device()
-    except Exception, e:
+    except Exception as e:
         print "Process terminate : {}".format(e)
     finally:
         if conn:

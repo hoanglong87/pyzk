@@ -74,7 +74,7 @@ class ZK(object):
         try:
             self.__sock.sendto(buf, self.__address)
             self.__data_recv = self.__sock.recv(response_size)
-        except Exception, e:
+        except Exception as e:
             raise ZKNetworkError(str(e))
 
         self.__response = unpack('HHHH', self.__data_recv[:8])[0]
