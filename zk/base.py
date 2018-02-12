@@ -456,7 +456,7 @@ class ZK(object):
 
         command = const.CMD_CANCELCAPTURE
         cmd_response = self.__send_command(command=command)
-        print cmd_response
+        print(cmd_response)
 
     def verify_user(self):
         '''
@@ -466,7 +466,7 @@ class ZK(object):
         command = const.CMD_STARTVERIFY
         # uid = chr(uid % 256) + chr(uid >> 8)
         cmd_response = self.__send_command(command=command)
-        print cmd_response
+        print(cmd_response)
 
     def enroll_user(self, uid):
         '''
@@ -477,7 +477,7 @@ class ZK(object):
         uid = chr(uid % 256) + chr(uid >> 8)
         command_string = pack('2s', uid)
         cmd_response = self.__send_command(command=command, command_string=command_string)
-        print cmd_response
+        print(cmd_response)
 
     def clear_data(self):
         '''
