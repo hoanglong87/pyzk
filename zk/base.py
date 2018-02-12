@@ -105,7 +105,7 @@ class ZK(object):
 
     def __reverse_hex(self, hex):
         data = ''
-        for i in reversed(xrange(len(hex) / 2)):
+        for i in reversed(range(int(len(hex) / 2))):
             data += hex[i * 2:(i * 2) + 2]
         return data
 
@@ -424,7 +424,7 @@ class ZK(object):
 
                 if userdata:
                     # The first 4 bytes don't seem to be related to the user
-                    for x in xrange(len(userdata)):
+                    for x in range(len(userdata)):
                         if x > 0:
                             userdata[x] = userdata[x][8:]
 
@@ -587,7 +587,7 @@ class ZK(object):
 
                 if attendance_data:
                     # The first 4 bytes don't seem to be related to the user
-                    for x in xrange(len(attendance_data)):
+                    for x in range(len(attendance_data)):
                         if x > 0:
                             attendance_data[x] = attendance_data[x][8:]
 
