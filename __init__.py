@@ -1,3 +1,3 @@
 # -*- coding: utf-8 -*-
 
-from zk import ZK
+from .zk import ZK
