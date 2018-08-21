@@ -564,26 +564,33 @@ class ZK(object):
             raise ZKErrorResponse("Can't set user")
         self.refresh_data()
 
-    def delete_user(self, uid):
+    def delete_user(self, uid=0, user_id=''):
         '''
-        delete specific user by uid
+        delete specific user by uid, user_id
         '''
-        command = const.CMD_DELETE_USER
-
-        uid = chr(uid % 256) + chr(uid >> 8)
-
-        command_string = pack('2s', uid)
-        checksum = 0
-        session_id = self.__sesion_id
-        reply_id = self.__reply_id
-        response_size = 1024
-
-        cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
-        if cmd_response.get('status'):
-            return True
+        if self.tcp:
+            if  not user_id:
+                # we need user_id (uid2)
+                users = self.get_users()
+                if len(users) == 1:
+                    user_id = users[0].user_id
+                else:
+                    return False
+            command = 133  # const.CMD_DELETE_USER_2
+            command_string = pack('24s', str(user_id))
         else:
-            raise ZKErrorResponse("Invalid response")
-
+            if not uid:
+                users = self.get_users()
+                users = list(filter(lambda x: x.user_id == str(user_id), users))
+                if not users:
+                    return False
+                uid = users[0].uid
+            command = const.CMD_DELETE_USER
+            command_string = pack('h', uid)
+        cmd_response = self.__send_command(command, command_string)
+        if not cmd_response.get('status'):
+            raise ZKErrorResponse("Can't delete user")
+        self.refresh_data()
     
     def __recieve_tcp_data(self, data_recv, size):
         """ data_recv, raw tcp packet
@@ -787,6 +794,7 @@ class ZK(object):
             raise ZKErrorResponse("can't read sizes")
         
     def get_max_uid(self):
+        """ return max uid"""
         self.read_sizes()
         return self.users
 
@@ -794,8 +802,6 @@ class ZK(object):
         """ return all user """
         self.read_sizes()  # last update
         if self.users == 0:  # lazy
-#             self.next_uid = 1
-#             self.next_user_id = '1'
             return []
         users = []
         max_uid = 0
