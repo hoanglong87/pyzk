@@ -11,14 +11,6 @@ from . import const
 from .attendance import Attendance
 from .exception import ZKErrorResponse, ZKNetworkError
 from .user import User
-from .finger import Finger
-
-def safe_cast(val, to_type, default=None):
-    # https://stackoverflow.com/questions/6330071/safe-casting-in-python
-    try:
-        return to_type(val)
-    except (ValueError, TypeError):
-        return default
 
 def make_commkey(key, session_id, ticks=50):
     """take a password and session_id and scramble them to send to the time
@@ -56,7 +48,7 @@ def make_commkey(key, session_id, ticks=50):
     return k
 
 class ZK_helper(object):
-    """ helper class """
+    """ helper class to check connection and protocol"""
     def __init__(self, ip, port=4370):
         self.address = (ip, port)
         self.ip = ip
@@ -112,27 +104,13 @@ class ZK(object):
         self.__sock.settimeout(timeout)
         self.__timeout = timeout
         self.__password = password  # passint
-        # self.firmware = int(firmware) #dummy
         self.force_udp = force_udp
         self.ommit_ping = ommit_ping
         self.verbose = verbose
         self.encoding = encoding
         self.tcp = False
         self.users = 0
-        self.fingers = 0
         self.records = 0
-        self.dummy = 0
-        self.cards = 0
-        self.fingers_cap = 0
-        self.users_cap = 0
-        self.rec_cap = 0
-        self.faces = 0
-        self.faces_cap = 0
-        self.fingers_av = 0
-        self.users_av = 0
-        self.rec_av = 0
-        self.next_uid = 1
-        self.next_user_id = '1'
         self.user_packet_size = 28  # default zk6
         self.end_live_capture = False
         self.__session_id = 0
@@ -241,18 +219,6 @@ class ZK(object):
             'code': self.__response
         }
     
-    def __ack_ok(self):
-        """ event ack ok """
-        buf = self.__create_header(const.CMD_ACK_OK, b'', self.__session_id, const.USHRT_MAX - 1)
-        try:
-            if self.tcp:
-                top = self.__create_tcp_top(buf)
-                self.__sock.send(top)
-            else:
-                self.__sock.sendto(buf, self.__address)
-        except Exception as e:
-            raise ZKNetworkError(str(e))
-
     def __get_data_size(self):
         """Checks a returned packet to see if it returned CMD_PREPARE_DATA,
         indicating that data packets are to be sent
@@ -476,6 +442,17 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("can't poweroff")
+    
+    def refresh_data(self):
+        '''
+        shutdown the device
+        '''
+        command = const.CMD_REFRESHDATA
+        cmd_response = self.__send_command(command)
+        if cmd_response.get('status'):
+            return True
+        else:
+            raise ZKErrorResponse("can't refresh data")
 
     def test_voice(self, index=0):
         '''
@@ -557,30 +534,6 @@ class ZK(object):
             return False  # some devices doesn't support sound
             # raise ZKErrorResponse("can't test voice")
 
-#     def set_user(self, uid, name, privilege, password='', group_id='', user_id=''):
-#         '''
-#         create or update user by uid
-#         '''
-#  
-#         command = const.CMD_USER_WRQ
-#  
-#         uid = chr(uid % 256) + chr(uid >> 8)
-#         if privilege not in [const.USER_DEFAULT, const.USER_ADMIN]:
-#             privilege = const.USER_DEFAULT
-#         privilege = chr(privilege)
-#  
-#         command_string = pack('2sc8s28sc7sx24s', uid, privilege, password, name, chr(0), group_id, user_id)
-#         checksum = 0
-#         session_id = self.__sesion_id
-#         reply_id = self.__reply_id
-#         response_size = 1024
-#  
-#         cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
-#         if cmd_response.get('status'):
-#             return True
-#         else:
-#             raise ZKErrorResponse("Invalid response")
-    
     def set_user(self, uid, name, privilege=0, password='', group_id='', user_id='', card=0):
         '''
         create or update user by uid
@@ -604,21 +557,12 @@ class ZK(object):
         else:
             name_pad = name.encode(self.encoding, errors='ignore').ljust(24, b'\x00')[:24]
             card_str = pack('i', int(card))[:4]
-            test_str = pack('HB8s24s4sx7sx24s', 0, 0, '', 'hoang long', '', '0', '111')
-            print (test_str)
             command_string = pack('HB8s24s4sx7sx24s', uid, privilege, password.encode(self.encoding, errors='ignore'), name_pad, card_str, group_id.encode(), user_id.encode())
-            print len(command_string)
-            _uid, _privilege, _password, _name, _card, _group_id, _user_id = unpack('<HB8s24sIx7sx24s', command_string)
         response_size = 1024  # TODO check response?
         cmd_response = self.__send_command(command, command_string, response_size)
         if not cmd_response.get('status'):
             raise ZKErrorResponse("Can't set user")
         self.refresh_data()
-        if self.next_uid == uid:
-            self.next_uid += 1  # better recalculate again
-        if self.next_user_id == user_id:
-            self.next_user_id = str(self.next_uid)
-
 
     def delete_user(self, uid):
         '''
@@ -833,35 +777,25 @@ class ZK(object):
         cmd_response = self.__send_command(command, b'', response_size)
         if cmd_response.get('status'):
             if self.verbose: print(codecs.encode(self.__data, 'hex'))
-            size = len(self.__data)
             if len(self.__data) >= 80:
                 fields = unpack('20i', self.__data[:80])
                 self.users = fields[4]
-                self.fingers = fields[6]
                 self.records = fields[8]
-                self.dummy = fields[10]  # ???
-                self.cards = fields[12]
-                self.fingers_cap = fields[14]
-                self.users_cap = fields[15]
-                self.rec_cap = fields[16]
-                self.fingers_av = fields[17]
-                self.users_av = fields[18]
-                self.rec_av = fields[19]
                 self.__data = self.__data[80:]
-            if len(self.__data) >= 12:  # face info
-                fields = unpack('3i', self.__data[:12])  # dirty hack! we need more information
-                self.faces = fields[0]
-                self.faces_cap = fields[2]
             return True
         else:
             raise ZKErrorResponse("can't read sizes")
+        
+    def get_max_uid(self):
+        self.read_sizes()
+        return self.users
 
     def get_users(self):  # ALWAYS CALL TO GET correct user_packet_size
         """ return all user """
         self.read_sizes()  # last update
         if self.users == 0:  # lazy
-            self.next_uid = 1
-            self.next_user_id = '1'
+#             self.next_uid = 1
+#             self.next_user_id = '1'
             return []
         users = []
         max_uid = 0
@@ -909,17 +843,6 @@ class ZK(object):
                 user = User(uid, name, privilege, password, group_id, user_id, card)
                 users.append(user)
                 userdata = userdata[72:]
-        # get limits!
-        max_uid += 1
-        self.next_uid = max_uid
-        self.next_user_id = str(max_uid)
-        # re check
-        while True:
-            if any(u for u in users if u.user_id == self.next_user_id):
-                max_uid += 1
-                self.next_user_id = str(max_uid)
-            else:
-                break
         return users
 
 
@@ -1029,58 +952,6 @@ class ZK(object):
 
         return total_data, data_recv
 
-#     def get_attendance(self, data_ack=True):
-#         '''
-#         return all attendance record
-#         :param data_ack: set to True to acknowledge if the order was performed successfully
-#         :type data_ack: Boolean
-#         :return list of Attendance records where each is Attendance(user_id, timestamp, status)
-#         :rtype: List
-#         '''
-#         command = const.CMD_ATTLOG_RRQ
-#         command_string = ''
-#         checksum = 0
-#         session_id = self.__sesion_id
-#         reply_id = self.__reply_id
-#         response_size = 1024
-#  
-#         cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
-#         attendances = []
-#         if cmd_response.get('status'):
-#             if cmd_response.get('code') == const.CMD_PREPARE_DATA:
-#                 attendance_data, data_recv = self.recv_timeout()
-#                 response = False
-#                 try:
-#                     if not data_recv:
-#                         data_recv = self.__sock.recv(8)
-#                     response = unpack('HHHH', data_recv[:8])[0]
-#                 except:
-#                     pass
-#                 if data_ack and response != const.CMD_ACK_OK:
-#                     raise ZKErrorResponse("Invalid response, code %s. The code should be 2000 (CMD_ACK_OK)" % response)
-#  
-#                 if attendance_data:
-#                     # The first 4 bytes don't seem to be related to the user
-#                     for x in range(len(attendance_data)):
-#                         if x > 0:
-#                             attendance_data[x] = attendance_data[x][8:]
-#  
-#                     attendance_data = ''.join(attendance_data)
-#                     attendance_data = attendance_data[14:]
-#                     while len(attendance_data) >= 38:
-#                         user_id, separator, timestamp, status, space = unpack('24sc4sc10s', attendance_data.ljust(40)[:40])
-#  
-#                         user_id = user_id.split('\x00')[0]
-#                         timestamp = self.__decode_time(timestamp)
-#                         status = int(status.encode("hex"), 16)
-#  
-#                         attendance = Attendance(user_id, timestamp, status)
-#                         attendances.append(attendance)
-#  
-#                         attendance_data = attendance_data[40:]
-#  
-#         return attendances
-    
     def get_attendance(self):
         """ return attendance record """
         self.read_sizes()
