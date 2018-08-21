@@ -882,22 +882,18 @@ class ZK(object):
         cmd_response = self.__send_command(command=command, command_string=command_string)
         print(cmd_response)
 
-    def clear_data(self):
+    def clear_data(self, clear_type=5):  # FCT_USER
         '''
         clear all data (include: user, attendance report, finger database )
+        2 = FCT_FINGERTMP
         '''
         command = const.CMD_CLEAR_DATA
-        command_string = ''
-        checksum = 0
-        session_id = self.__sesion_id
-        reply_id = self.__reply_id
-        response_size = 1024
-
-        cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
+        command_string = pack("B", clear_type)
+        cmd_response = self.__send_command(command, command_string)
         if cmd_response.get('status'):
             return True
         else:
-            raise ZKErrorResponse("Invalid response")
+            raise ZKErrorResponse("can't clear data")
 
     def recv_timeout(self, buff=1032):
 
@@ -1021,20 +1017,14 @@ class ZK(object):
                 attendance_data = attendance_data[40:]
         return attendances
 
-
     def clear_attendance(self):
         '''
         clear all attendance record
         '''
         command = const.CMD_CLEAR_ATTLOG
-        command_string = ''
-        checksum = 0
-        session_id = self.__sesion_id
-        reply_id = self.__reply_id
-        response_size = 1024
-
-        cmd_response = self.__send_command(command, command_string, checksum, session_id, reply_id, response_size)
+        cmd_response = self.__send_command(command)
         if cmd_response.get('status'):
             return True
         else:
-            raise ZKErrorResponse("Invalid response")
+            raise ZKErrorResponse("can't clear response")
+
