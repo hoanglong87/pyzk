@@ -230,10 +230,10 @@ class ZK(object):
             return size
         else:
             return 0
-        
+
     def __reverse_hex(self, hex):
         data = ''
-        for i in reversed(xrange(len(hex) / 2)):
+        for i in reversed(range(int(len(hex) / 2))):
             data += hex[i * 2:(i * 2) + 2]
         return data
 
