@@ -9,7 +9,7 @@ import sys
 
 from . import const
 from .attendance import Attendance
-from .exception import ZKErrorResponse, ZKNetworkError
+from .exception import ZKErrorResponse, ZKNetworkError, TimeoutError
 from .user import User
 
 def make_commkey(key, session_id, ticks=50):
@@ -95,14 +95,13 @@ class ZK(object):
     __timeout = 0
 
     def __init__(self, ip, port=4370, timeout=60, password=0, force_udp=False, ommit_ping=False, verbose=False, encoding='UTF-8'):
-        """ initialize instance """
+        self.__timeout = timeout
         self.is_connect = False
         self.is_enabled = True  # let's asume
         self.helper = ZK_helper(ip, port)
         self.__address = (ip, port)
         self.__sock = socket(AF_INET, SOCK_DGRAM)
-        self.__sock.settimeout(timeout)
-        self.__timeout = timeout
+        self.__sock.settimeout(self.__timeout)
         self.__password = password  # passint
         self.force_udp = force_udp
         self.ommit_ping = ommit_ping
@@ -122,9 +121,11 @@ class ZK(object):
         """ based on self.tcp"""
         if self.tcp:
             self.__sock = socket(AF_INET, SOCK_STREAM)
+            self.__sock.settimeout(self.__timeout)
             self.__sock.connect_ex(self.__address)
         else:
             self.__sock = socket(AF_INET, SOCK_DGRAM)
+            self.__sock.settimeout(self.__timeout)
 
     def __create_tcp_top(self, packet):
         """ witch the complete packet set top header """
@@ -203,6 +204,8 @@ class ZK(object):
                 self.__sock.sendto(buf, self.__address)
                 self.__data_recv = self.__sock.recv(response_size)
                 self.__header = unpack('<4H', self.__data_recv[:8])
+        except timeout as e:
+            raise TimeoutError("Timeout!")
         except Exception as e:
             raise ZKNetworkError(str(e))
 
@@ -299,12 +302,19 @@ class ZK(object):
         self.__create_socket()  # tcp based
         self.__session_id = 0
         self.__reply_id = const.USHRT_MAX - 1
-        cmd_response = self.__send_command(const.CMD_CONNECT)
-        self.__session_id = self.__header[2]
-        if cmd_response.get('code') == const.CMD_ACK_UNAUTH:
-            if self.verbose: print ("try auth")
-            command_string = make_commkey(self.__password, self.__session_id)
-            cmd_response = self.__send_command(const.CMD_AUTH, command_string)
+        try:
+            cmd_response = self.__send_command(const.CMD_CONNECT)
+            self.__session_id = self.__header[2]
+            if cmd_response.get('code') == const.CMD_ACK_UNAUTH:
+                if self.verbose: print ("try auth")
+                command_string = make_commkey(self.__password, self.__session_id)
+                cmd_response = self.__send_command(const.CMD_AUTH, command_string)
+        except TimeoutError as e:
+            msg = "Could not connect to the device at {} via port {} due to timeout!".format(self.__address[0], self.__address[1])
+            if self.verbose:
+                print (msg)
+            raise TimeoutError(msg)
+        
         if cmd_response.get('status'):
             self.is_connect = True
             # set the session id
