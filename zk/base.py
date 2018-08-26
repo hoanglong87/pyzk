@@ -905,65 +905,6 @@ class ZK(object):
         else:
             raise ZKErrorResponse("can't clear data")
 
-    def recv_timeout(self, buff=1032):
-
-        total_bytes = self.__get_data_size()
-        org_total_bytes = total_bytes
-
-        # make socket non blocking
-        self.__sock.setblocking(0)
-
-        def is_ready(sock, timeout):
-            ready = select.select([sock], [], [], timeout)
-            if ready[0]:
-                return True
-            else:
-                return False
-
-        # total data partwise in an array
-        total_data = [];
-        data_recv = False
-
-        # beginning time
-        begin = time.time()
-        while 1:
-            # if you got some data, then break after timeout
-            if total_data and time.time() - begin > self.__timeout:
-                break
-
-            # if you got no data at all, wait a little longer, twice the timeout
-            elif time.time() - begin > self.__timeout * 2:
-                break
-
-            # recv something
-            try:
-                data = False
-                if org_total_bytes > 0:
-                    if is_ready(self.__sock, self.__timeout):
-                        data = self.__sock.recv(buff)
-                else:
-                    if is_ready(self.__sock, self.__timeout):
-                        data = self.__sock.recv(8)
-
-                if data:
-                    if org_total_bytes > 0:
-                        total_data.append(data)
-                    else:
-                        data_recv = data
-
-                    org_total_bytes -= (buff - 8)
-                    # change the beginning time for measurement
-                    begin = time.time()
-                else:
-                    # sleep for sometime to indicate a gap
-                    time.sleep(0.1)
-            except:
-                pass
-
-        self.__sock.settimeout(self.__timeout)
-
-        return total_data, data_recv
-
     def get_attendance(self):
         """ return attendance record """
         self.read_sizes()
