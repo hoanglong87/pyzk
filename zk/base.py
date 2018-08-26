@@ -825,7 +825,7 @@ class ZK(object):
         if not self.user_packet_size in [28, 72]:
             if self.verbose: print("WRN packet size would be  %i" % self.user_packet_size)
         userdata = userdata[4:]
-        if self.user_packet_size == 28:
+        if self.user_packet_size == 28: # self.firmware == 6:
             while len(userdata) >= 28:
                 uid, privilege, password, name, card, group_id, timezone, user_id = unpack('<HB5s8sIxBhI', userdata.ljust(28, b'\x00')[:28])
                 if uid > max_uid: max_uid = uid

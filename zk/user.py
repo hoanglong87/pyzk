@@ -4,9 +4,9 @@ class User(object):
 
     def __init__(self, uid, name, privilege, password='', group_id='', user_id='', card=0):
         self.uid = uid
-        self.name = str(name)
+        self.name = name
         self.privilege = privilege
-        self.password = str(password)
+        self.password = password
         self.group_id = group_id
         self.user_id = user_id
         self.card = card  # 64 int to 40 bit int
