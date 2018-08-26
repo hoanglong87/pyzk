@@ -9,3 +9,6 @@ class ZKErrorResponse(ZKError):
 
 class ZKNetworkError(ZKError):
     pass
+
+class TimeoutError(ZKNetworkError):
+    pass
