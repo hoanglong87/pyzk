@@ -2,8 +2,6 @@
 from datetime import datetime
 from socket import AF_INET, SOCK_DGRAM, SOCK_STREAM, socket, timeout
 from struct import pack, unpack
-import time
-import select
 import codecs
 import sys
 
@@ -11,6 +9,10 @@ from . import const
 from .attendance import Attendance
 from .exception import ZKErrorResponse, ZKNetworkError, TimeoutError
 from .user import User
+
+import logging
+
+_logger = logging.getLogger(__name__)
 
 def make_commkey(key, session_id, ticks=50):
     """take a password and session_id and scramble them to send to the time
@@ -571,7 +573,10 @@ class ZK(object):
         response_size = 1024  # TODO check response?
         cmd_response = self.__send_command(command, command_string, response_size)
         if not cmd_response.get('status'):
+            _logger.debug("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
             raise ZKErrorResponse("Can't set user")
+        _logger.debug("Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)        
+        self.max_uid = int(uid)
         self.refresh_data()
 
     def delete_user(self, uid=0, user_id=''):
@@ -805,8 +810,13 @@ class ZK(object):
         
     def get_max_uid(self):
         """ return max uid"""
-        self.read_sizes()
-        return self.users
+        if not hasattr(self, 'max_uid'):
+            users = self.get_users()
+            if len(users) > 0:
+                self.max_uid = users[-1].uid
+            else:
+                self.max_uid = 0
+        return self.max_uid
 
     def get_users(self):  # ALWAYS CALL TO GET correct user_packet_size
         """ return all user """
