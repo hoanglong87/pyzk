@@ -805,8 +805,11 @@ class ZK(object):
         
     def get_max_uid(self):
         """ return max uid"""
-        self.read_sizes()
-        return self.users
+        users = self.get_users()
+        if len(users) > 0:
+            return users[-1].uid
+        else:
+            return 0
 
     def get_users(self):  # ALWAYS CALL TO GET correct user_packet_size
         """ return all user """
@@ -825,7 +828,7 @@ class ZK(object):
         if not self.user_packet_size in [28, 72]:
             if self.verbose: print("WRN packet size would be  %i" % self.user_packet_size)
         userdata = userdata[4:]
-        if self.user_packet_size == 28: # self.firmware == 6:
+        if self.user_packet_size == 28:  # self.firmware == 6:
             while len(userdata) >= 28:
                 uid, privilege, password, name, card, group_id, timezone, user_id = unpack('<HB5s8sIxBhI', userdata.ljust(28, b'\x00')[:28])
                 if uid > max_uid: max_uid = uid
