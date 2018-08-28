@@ -2,6 +2,8 @@
 from datetime import datetime
 from socket import AF_INET, SOCK_DGRAM, SOCK_STREAM, socket, timeout
 from struct import pack, unpack
+import time
+import select
 import codecs
 import sys
 
@@ -10,9 +12,7 @@ from .attendance import Attendance
 from .exception import ZKErrorResponse, ZKNetworkError, TimeoutError
 from .user import User
 
-import logging
-
-_logger = logging.getLogger(__name__)
+gl_max_uid = 0
 
 def make_commkey(key, session_id, ticks=50):
     """take a password and session_id and scramble them to send to the time
@@ -88,13 +88,6 @@ class ZK_helper(object):
 
 
 class ZK(object):
-
-    is_connect = False
-
-    __data_recv = None
-    __sesion_id = 0
-    __reply_id = 0
-    __timeout = 0
 
     def __init__(self, ip, port=4370, timeout=60, password=0, force_udp=False, ommit_ping=False, verbose=False, encoding='UTF-8'):
         self.__timeout = timeout
@@ -550,6 +543,8 @@ class ZK(object):
         '''
         create or update user by uid
         '''
+        global gl_max_uid
+        uid = gl_max_uid + 1
         command = const.CMD_USER_WRQ
         if not user_id:
             user_id = str(uid)  # ZK6 needs uid2 == uid
@@ -573,9 +568,8 @@ class ZK(object):
         response_size = 1024  # TODO check response?
         cmd_response = self.__send_command(command, command_string, response_size)
         if not cmd_response.get('status'):
-            _logger.debug("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
             raise ZKErrorResponse("Can't set user")
-        _logger.debug("Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)        
+        gl_max_uid += 1
         self.refresh_data()
 
     def delete_user(self, uid=0, user_id=''):
@@ -807,15 +801,6 @@ class ZK(object):
         else:
             raise ZKErrorResponse("can't read sizes")
         
-    def get_max_uid(self):
-        """ return max uid"""
-        users = self.get_users()
-        if len(users) > 0:
-            max_uid = users[-1].uid
-        else:
-            max_uid = 0
-        return max_uid
-
     def get_users(self):  # ALWAYS CALL TO GET correct user_packet_size
         """ return all user """
         self.read_sizes()  # last update
@@ -833,7 +818,7 @@ class ZK(object):
         if not self.user_packet_size in [28, 72]:
             if self.verbose: print("WRN packet size would be  %i" % self.user_packet_size)
         userdata = userdata[4:]
-        if self.user_packet_size == 28: # self.firmware == 6:
+        if self.user_packet_size == 28:  # self.firmware == 6:
             while len(userdata) >= 28:
                 uid, privilege, password, name, card, group_id, timezone, user_id = unpack('<HB5s8sIxBhI', userdata.ljust(28, b'\x00')[:28])
                 if uid > max_uid: max_uid = uid
@@ -867,6 +852,9 @@ class ZK(object):
                 user = User(uid, name, privilege, password, group_id, user_id, card)
                 users.append(user)
                 userdata = userdata[72:]
+        global gl_max_uid
+        if len(users) > 0:
+            gl_max_uid = users[-1].uid
         return users
 
 
