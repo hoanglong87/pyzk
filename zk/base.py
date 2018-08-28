@@ -14,6 +14,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+
 def make_commkey(key, session_id, ticks=50):
     """take a password and session_id and scramble them to send to the time
     clock.
@@ -49,8 +50,10 @@ def make_commkey(key, session_id, ticks=50):
         k[3] ^ B)
     return k
 
+
 class ZK_helper(object):
     """ helper class to check connection and protocol"""
+
     def __init__(self, ip, port=4370):
         self.address = (ip, port)
         self.ip = ip
@@ -118,7 +121,7 @@ class ZK(object):
         self.__reply_id = const.USHRT_MAX - 1
         self.__data_recv = None
         self.__data = None
-        
+
     def __create_socket(self):
         """ based on self.tcp"""
         if self.tcp:
@@ -177,7 +180,7 @@ class ZK(object):
             checksum += const.USHRT_MAX
 
         return pack('H', checksum)
-    
+
     def __test_tcp_top(self, packet):
         """ return size!"""
         if len(packet) <= 8:
@@ -223,7 +226,7 @@ class ZK(object):
             'status': False,
             'code': self.__response
         }
-    
+
     def __get_data_size(self):
         """Checks a returned packet to see if it returned CMD_PREPARE_DATA,
         indicating that data packets are to be sent
@@ -272,25 +275,25 @@ class ZK(object):
         d = datetime(year, month, day, hour, minute, second)
 
         return d
-    
+
     def __decode_timehex(self, timehex):
         """timehex string of six bytes"""
         year, month, day, hour, minute, second = unpack("6B", timehex)
         year += 2000
         d = datetime(year, month, day, hour, minute, second)
         return d
-    
+
     def __encode_time(self, t):
         """Encode a timestamp so that it can be read on the timeclock
         """
         # formula taken from zkemsdk.c - EncodeTime
         # can also be found in the technical manual
         d = (
-            ((t.year % 100) * 12 * 31 + ((t.month - 1) * 31) + t.day - 1) * 
+            ((t.year % 100) * 12 * 31 + ((t.month - 1) * 31) + t.day - 1) *
             (24 * 60 * 60) + (t.hour * 60 + t.minute) * 60 + t.second
         )
         return d
-    
+
     def connect(self):
         '''
         connect to the device
@@ -316,7 +319,7 @@ class ZK(object):
             if self.verbose:
                 print (msg)
             raise TimeoutError(msg)
-        
+
         if cmd_response.get('status'):
             self.is_connect = True
             # set the session id
@@ -339,7 +342,7 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("can't disconnect")
-        
+
     def disable_device(self):
         '''
         disable (lock) device, ensure no activity when process run
@@ -361,7 +364,7 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("Can't enable device")
-    
+
     def get_firmware_version(self):
         '''
         return the firmware version
@@ -388,14 +391,14 @@ class ZK(object):
             return serialnumber
         else:
             raise ZKErrorResponse("Invalid response")
-    
+
     def get_serialnumber(self):
         '''
         return the serial number
         '''
         command_string = b'~SerialNumber'
         return self._get_options_rrq(command_string).replace(b'=', b'').decode()
-    
+
     def get_oem_vendor(self):
         '''
         return the OEM Vendor of the device
@@ -416,14 +419,14 @@ class ZK(object):
         '''
         command_string = b'~Platform'
         return self._get_options_rrq(command_string).replace(b'=', b'').decode()
-    
+
     def get_device_name(self):
         '''
         return the name of the device, e.g. B3-C
         '''
         command_string = b'~DeviceName'
         return self._get_options_rrq(command_string).decode()
-    
+
     def get_workcode(self):
         '''
         return the work code
@@ -454,7 +457,7 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("can't poweroff")
-    
+
     def refresh_data(self):
         '''
         shutdown the device
@@ -569,14 +572,29 @@ class ZK(object):
         else:
             name_pad = name.encode(self.encoding, errors='ignore').ljust(24, b'\x00')[:24]
             card_str = pack('i', int(card))[:4]
+            if isinstance(group_id, int):
+                group_id = str(group_id)
             command_string = pack('HB8s24s4sx7sx24s', uid, privilege, password.encode(self.encoding, errors='ignore'), name_pad, card_str, group_id.encode(), user_id.encode())
         response_size = 1024  # TODO check response?
         cmd_response = self.__send_command(command, command_string, response_size)
         if not cmd_response.get('status'):
-            _logger.debug("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
+            _logger.error("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
             raise ZKErrorResponse("Can't set user")
-        _logger.debug("Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)        
+        _logger.debug("Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
+        self.max_uid = int(uid)
         self.refresh_data()
+
+    def get_max_uid(self):
+        """
+        This method will get the max uid either from the device of object cache (if any)
+        """
+        if not hasattr(self, 'max_uid'):
+            users = self.get_users()
+            if len(users) > 0:
+                self.max_uid = users[-1].uid
+            else:
+                self.max_uid = 0
+        return self.max_uid
 
     def delete_user(self, uid=0, user_id=''):
         '''
@@ -604,8 +622,16 @@ class ZK(object):
         cmd_response = self.__send_command(command, command_string)
         if not cmd_response.get('status'):
             raise ZKErrorResponse("Can't delete user")
+        self._decrease_max_uid()
         self.refresh_data()
-    
+
+    def _decrease_max_uid(self):
+        """
+        This method will decrease self.max_uid by 1 if it is set in the object cache
+        """
+        if hasattr(self, 'max_uid'):
+            self.max_uid -= 1
+
     def __recieve_tcp_data(self, data_recv, size):
         """ data_recv, raw tcp packet
          must analyze tcp_length
@@ -659,7 +685,6 @@ class ZK(object):
             return b''.join(data), broken_header
             # get cmd_ack_ok on __rchunk
 
-
     def __recieve_raw_data(self, size):
         """ partial data ? """
         data = []
@@ -672,7 +697,7 @@ class ZK(object):
             size -= recieved
             if self.verbose: print ("still need {}".format(size))
         return b''.join(data)
-    
+
     def __recieve_chunk(self):
         """ recieve a chunk """
         if self.__response == const.CMD_DATA:  # less than 1024!!!
@@ -730,7 +755,7 @@ class ZK(object):
         else:
             if self.verbose: print ("invalid response %s" % self.__response)
             return None  # ("can't get user template")
-    
+
     def __read_chunk(self, start, size):
         """ read a chunk from buffer """
         for _retries in range(3):
@@ -780,7 +805,7 @@ class ZK(object):
         self.free_data()
         if self.verbose: print ("_read w/chunk %i bytes" % start)
         return b''.join(data), start
-    
+
     def free_data(self):
         """ clear buffer"""
         command = const.CMD_FREE_DATA
@@ -790,7 +815,6 @@ class ZK(object):
         else:
             raise ZKErrorResponse("can't free data")
 
-    
     def read_sizes(self):
         """ read sizes """
         command = const.CMD_GET_FREE_SIZES
@@ -806,15 +830,6 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("can't read sizes")
-        
-    def get_max_uid(self):
-        """ return max uid"""
-        users = self.get_users()
-        if len(users) > 0:
-            max_uid = users[-1].uid
-        else:
-            max_uid = 0
-        return max_uid
 
     def get_users(self):  # ALWAYS CALL TO GET correct user_packet_size
         """ return all user """
@@ -868,7 +883,6 @@ class ZK(object):
                 users.append(user)
                 userdata = userdata[72:]
         return users
-
 
     def cancel_capture(self):
         '''
@@ -970,7 +984,7 @@ class ZK(object):
                 user_id = (user_id.split(b'\x00')[0]).decode(errors='ignore')
                 timestamp = self.__decode_time(timestamp)
                 # status = int(status.encode("hex"), 16)
- 
+
                 attendance = Attendance(user_id, timestamp, status, punch, uid)
                 attendances.append(attendance)
                 attendance_data = attendance_data[40:]
