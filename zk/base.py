@@ -578,7 +578,7 @@ class ZK(object):
         response_size = 1024  # TODO check response?
         cmd_response = self.__send_command(command, command_string, response_size)
         if not cmd_response.get('status'):
-            _logger.debug("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
+            _logger.error("Could not Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
             raise ZKErrorResponse("Can't set user")
         _logger.debug("Set User: name_pad: %s, uid: %s, user_id: %s", name_pad, uid, user_id)
         self.max_uid = int(uid)
