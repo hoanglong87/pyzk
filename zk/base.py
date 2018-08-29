@@ -589,11 +589,8 @@ class ZK(object):
         This method will get the max uid either from the device of object cache (if any)
         """
         if not hasattr(self, 'max_uid'):
-            users = self.get_users()
-            if len(users) > 0:
-                self.max_uid = users[-1].uid
-            else:
-                self.max_uid = 0
+            # call get_users to get self.max_uid set
+            self.get_users()
         return self.max_uid
 
     def delete_user(self, uid=0, user_id=''):
@@ -882,6 +879,9 @@ class ZK(object):
                 user = User(uid, name, privilege, password, group_id, user_id, card)
                 users.append(user)
                 userdata = userdata[72:]
+            
+            # set max_uid for the object
+            self.max_uid = max_uid
         return users
 
     def cancel_capture(self):
