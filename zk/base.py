@@ -123,6 +123,7 @@ class ZK(object):
         self.__reply_id = const.USHRT_MAX - 1
         self.__data_recv = None
         self.__data = None
+        self.max_uid = 0
 
     def __create_socket(self):
         """ based on self.tcp"""
@@ -1046,6 +1047,9 @@ class ZK(object):
                     user = tusers[0]
                 else:
                     raise ZKErrorResponse("Can't find user")
+        for finger in fingers:
+            finger = Finger(finger['uid'], finger['fid'], finger['valid'], finger['template'])
+        
         if isinstance(fingers, Finger):
             fingers = [fingers]
         fpack = ""
@@ -1078,7 +1082,7 @@ class ZK(object):
         """
         if self.tcp and user_id:
             command = 134  # unknown?
-            command_string = pack('<24sB', str(user_id), temp_id)
+            command_string = pack('<24sB', str(user_id).encode(encoding=self.encoding, errors='ignore'), temp_id)
             cmd_response = self.__send_command(command, command_string)
             #        users = list(filter(lambda x: x.uid==uid, users))
             if cmd_response.get('status'):
