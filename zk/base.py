@@ -98,6 +98,7 @@ class ZK(object):
     __sesion_id = 0
     __reply_id = 0
     __timeout = 0
+    max_uid = 0
 
     def __init__(self, ip, port=4370, timeout=60, password=0, force_udp=False, ommit_ping=False, verbose=False, encoding='UTF-8'):
         self.__timeout = timeout
@@ -588,7 +589,7 @@ class ZK(object):
         """
         This method will get the max uid either from the device of object cache (if any)
         """
-        if not hasattr(self, 'max_uid'):
+        if not self.max_uid:
             # call get_users to get self.max_uid set
             self.get_users()
         return self.max_uid
@@ -626,7 +627,7 @@ class ZK(object):
         """
         This method will decrease self.max_uid by 1 if it is set in the object cache
         """
-        if hasattr(self, 'max_uid'):
+        if self.max_uid > 0:
             self.max_uid -= 1
 
     def __recieve_tcp_data(self, data_recv, size):
@@ -879,7 +880,7 @@ class ZK(object):
                 user = User(uid, name, privilege, password, group_id, user_id, card)
                 users.append(user)
                 userdata = userdata[72:]
-            
+
             # set max_uid for the object
             self.max_uid = max_uid
         return users
