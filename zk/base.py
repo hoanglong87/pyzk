@@ -957,7 +957,9 @@ class ZK(object):
         if self.records == 0:  # lazy
             return []
         users = self.get_users()
-        _logger.debug("Users: %s", users)
+        for user in users:
+            _logger.debug("Users: %s", user)
+
         _logger.debug("Total Records: %s", self.records)
         attendances = []
         attendance_data, size = self.read_with_buffer(const.CMD_ATTLOG_RRQ)
@@ -966,7 +968,7 @@ class ZK(object):
             return []
         total_size = unpack("I", attendance_data[:4])[0]
         record_size = total_size / self.records
-        _logger.debug("record_size is ", record_size)
+        _logger.debug("record_size is %s", record_size)
         attendance_data = attendance_data[4:]  # total size not used
         if record_size == 8 :  # ultra old format
             while len(attendance_data) >= 8:  #TODO RETEST ZK6!!!
@@ -1011,6 +1013,7 @@ class ZK(object):
                 # status = int(status.encode("hex"), 16)
 
                 attendance = Attendance(user_id, timestamp, status, punch, uid)
+                _logger.debug(attendance)
                 attendances.append(attendance)
                 attendance_data = attendance_data[40:]
         return attendances
