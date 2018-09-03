@@ -1013,6 +1013,7 @@ class ZK(object):
                 # status = int(status.encode("hex"), 16)
 
                 attendance = Attendance(user_id, timestamp, status, punch, uid)
+                _logger.debug(attendance)
                 attendances.append(attendance)
                 attendance_data = attendance_data[40:]
         return attendances
