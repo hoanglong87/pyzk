@@ -968,7 +968,7 @@ class ZK(object):
             return []
         total_size = unpack("I", attendance_data[:4])[0]
         record_size = total_size / self.records
-        _logger.debug("record_size is ", record_size)
+        _logger.debug("record_size is %s", record_size)
         attendance_data = attendance_data[4:]  # total size not used
         if record_size == 8 :  # ultra old format
             while len(attendance_data) >= 8:  #TODO RETEST ZK6!!!
