@@ -123,7 +123,6 @@ class ZK(object):
         self.__reply_id = const.USHRT_MAX - 1
         self.__data_recv = None
         self.__data = None
-        self.max_uid = 0
 
     def __create_socket(self):
         """ based on self.tcp"""
@@ -609,7 +608,7 @@ class ZK(object):
                 else:
                     return False
             command = 133  # const.CMD_DELETE_USER_2
-            command_string = pack('24s', str(user_id))
+            command_string = pack('24s', str(user_id).encode(encoding=self.encoding, errors='ignore'))
         else:
             if not uid:
                 users = self.get_users()
@@ -1030,33 +1029,50 @@ class ZK(object):
             return True
         else:
             raise ZKErrorResponse("can't clear response")
+    
+    def _send_with_buffer(self, buffer):
+        MAX_CHUNK = 1024
+        size = len(buffer)
+        # free_Data
+        self.free_data()
+        # send prepare_data
+        command = const.CMD_PREPARE_DATA
+        command_string = pack('I', size)
+        cmd_response = self.__send_command(command, command_string)
+        if not cmd_response.get('status'):
+            raise ZKErrorResponse("Can't prepare data")
+        remain = size % MAX_CHUNK
+        packets = (size - remain) // MAX_CHUNK
+        start = 0
+        for _wlk in range(packets):
+            self.__send_chunk(buffer[start:start + MAX_CHUNK])
+            start += MAX_CHUNK
+        if remain:
+            self.__send_chunk(buffer[start:start + remain])
+
+    def __send_chunk(self, command_string):
+        command = const.CMD_DATA
+        cmd_response = self.__send_command(command, command_string)
+        if cmd_response.get('status'):
+            return True  # refres_data (1013)?
+        else:
+            raise ZKErrorResponse("Can't send chunk")
+
         
-    def save_user_template(self, user, fingers=[]):
+    def save_user_template(self, uid, name, privilege, password, group_id, user_id, fingers=[]):
         """ save user and template """
-        # TODO: grabado global
-        # armar paquete de huellas
-        if not isinstance(user, User):
-            # try uid
-            users = self.get_users()
-            tusers = list(filter(lambda x: x.uid == user, users))
-            if len(tusers) == 1:
-                user = tusers[0]
-            else:
-                tusers = list(filter(lambda x: x.user_id == str(user), users))
-                if len(tusers) == 1:
-                    user = tusers[0]
-                else:
-                    raise ZKErrorResponse("Can't find user")
+        user = User(uid, name.encode(encoding=self.encoding, errors='ignore'), privilege, password.encode(encoding=self.encoding, errors='ignore'), group_id.encode(encoding=self.encoding, errors='ignore'), user_id.encode(encoding=self.encoding, errors='ignore'))        
+        new_fingers = []        
         for finger in fingers:
-            finger = Finger(finger['uid'], finger['fid'], finger['valid'], finger['template'])
+            new_fingers.append(Finger(finger['uid'], finger['fid'], finger['valid'], finger['template']))
         
-        if isinstance(fingers, Finger):
-            fingers = [fingers]
         fpack = ""
         table = ""
+        table = table.encode(encoding=self.encoding, errors='ignore')
+        fpack = fpack.encode(encoding=self.encoding, errors='ignore')
         fnum = 0x10  # possibly flag
         tstart = 0
-        for finger in fingers:
+        for finger in new_fingers:
             tfp = finger.repack_only()
             table += pack("<bHbI", 2, user.uid, fnum + finger.fid, tstart)
             tstart += len(tfp)
@@ -1109,10 +1125,10 @@ class ZK(object):
         templates = []
         templatedata, size = self.read_with_buffer(const.CMD_DB_RRQ, const.FCT_FINGERTMP)
         if size < 4:
-            if self.verbose: print("WRN: no user data")  # debug
+            _logger.debug("WRN: no user data") # debug
             return []
         total_size = unpack('i', templatedata[0:4])[0]
-        print ("get template total size {}, size {} len {}".format(total_size, size, len(templatedata)))
+        _logger.debug("get template total size {}, size {} len {}".format(total_size, size, len(templatedata)))
         templatedata = templatedata[4:]  # total size not used
         # ZKFinger VX10.0 the only finger firmware tested
         while total_size:
@@ -1125,7 +1141,3 @@ class ZK(object):
             templatedata = templatedata[size:]
             total_size -= size
         return templates
-
-    
-
-
