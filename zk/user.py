@@ -17,7 +17,7 @@ class User(object):
         # 0,0 => 7sx group id, timezone?
         return pack("<BHB8s24sIB7sx24s", 2, self.uid, self.privilege, self.password, self.name, self.card, 1, self.group_id, str(self.user_id))
     def __str__(self):
-        return '<User>: [uid:{}, name:{} user_id:{}]'.format(self.uid, self.name, self.user_id)
+        return u'<User>: [uid:{}, name:{} user_id:{}]'.format(self.uid, self.name, self.user_id)
 
     def __repr__(self):
-        return '<User>: [uid:{}, name:{} user_id:{}]'.format(self.uid, self.name, self.user_id)
+        return u'<User>: [uid:{}, name:{} user_id:{}]'.format(self.uid, self.name, self.user_id)
