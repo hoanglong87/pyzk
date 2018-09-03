@@ -957,7 +957,9 @@ class ZK(object):
         if self.records == 0:  # lazy
             return []
         users = self.get_users()
-        _logger.debug("Users: %s", users)
+        for user in users:
+            _logger.debug("Users: %s", user)
+
         _logger.debug("Total Records: %s", self.records)
         attendances = []
         attendance_data, size = self.read_with_buffer(const.CMD_ATTLOG_RRQ)
