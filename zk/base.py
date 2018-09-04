@@ -862,7 +862,7 @@ class ZK(object):
         userdata, size = self.read_with_buffer(const.CMD_USERTEMP_RRQ, const.FCT_USER)
         _logger.debug("user size {} (= {})".format(size, len(userdata)))
         if size <= 4:
-            print("WRN: missing user data")  # debug
+            _logger.debug("WRN: missing user data") # debug
             return []
         total_size = unpack("I", userdata[:4])[0]
         self.user_packet_size = total_size / self.users
